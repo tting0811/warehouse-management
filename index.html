@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>倉庫管理系統</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        main {
+            flex: 1;
+        }
+        footer {
+            position: relative;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">倉庫管理系統</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="切換導航">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#">首頁</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">庫存管理</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">報表</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mt-4">
+        <h1 class="text-center mb-4">庫存儀表板</h1>
+        <div class="d-flex justify-content-end mb-3">
+            <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                <i class="fas fa-plus"></i> 新增物品
+            </button>
+            <button class="btn btn-secondary"><i class="fas fa-file-export"></i> 匯出</button>
+        </div>
+
+        <!-- Add Item Modal -->
+        <div class="modal fade" id="addItemModal" tabindex="-1" aria-labelledby="addItemModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addItemModalLabel">新增物品</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="addItemForm">
+                            <!-- 隱藏欄位，用於存儲正在編輯的貨物 ID -->
+                            <input type="hidden" id="itemId" value="">
+                            <!-- <div class="mb-3">
+                                <label for="itemLabel" class="form-label">標籤</label>
+                                <input type="text" class="form-control" id="itemLabel" readonly>
+                            </div> -->
+                            <div class="mb-3">
+                                <label for="itemColor" class="form-label">顏色</label>
+                                <select class="form-select" id="itemColor" required></select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="itemMaterial" class="form-label">材料</label>
+                                <select class="form-select" id="itemMaterial" required></select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="itemModel" class="form-label">型號</label>
+                                <select class="form-select" id="itemModel" required></select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="itemType1" class="form-label">類型1</label>
+                                <select class="form-select" id="itemType1" required></select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="itemType2" class="form-label">類型2</label>
+                                <select class="form-select" id="itemType2" required></select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="itemQuantity" class="form-label">數量</label>
+                                <input type="number" class="form-control" id="itemQuantity" required min="1">
+                            </div>
+                            <button type="submit" class="btn btn-primary">新增</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <table class="table table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>標籤</th>
+                    <th>顏色</th>
+                    <th>材料</th>
+                    <th>型號</th>
+                    <th>類型1</th>
+                    <th>類型2</th>
+                    <th>數量</th>
+                    <th>新增時間</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="itemsTableBody">
+                <!-- 動態加載數據 -->
+            </tbody>
+        </table>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white text-center py-3">
+        <p>&copy; 2023 倉庫管理系統</p>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- 新增物品 JS -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const modelSelect = document.getElementById('itemModel');
+            const type1Select = document.getElementById('itemType1');
+            const type2Select = document.getElementById('itemType2');
+            const tableBody = document.getElementById('itemsTableBody');
+
+            // 動態載入材料選項
+            fetch('backend/get_options.php?type=material')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const materialSelect = document.getElementById('itemMaterial');
+                    materialSelect.innerHTML = '';
+                    if (data.length === 0) {
+                        console.warn('No materials found.');
+                    }
+                    data.forEach(material => {
+                        const option = document.createElement('option');
+                        option.value = material;
+                        option.textContent = material;
+                        materialSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error fetching materials:', error));
+
+            // 動態載入顏色選項
+            fetch('backend/get_options.php?type=color')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const colorSelect = document.getElementById('itemColor');
+                    colorSelect.innerHTML = '';
+                    if (data.length === 0) {
+                        console.warn('No colors found.');
+                    }
+                    data.forEach(color => {
+                        const option = document.createElement('option');
+                        option.value = color;
+                        option.textContent = color;
+                        colorSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error fetching colors:', error));
+
+            // 動態載入型號選項
+            fetch('backend/get_options.php?type=model_aux')
+                .then(response => response.json())
+                .then(data => {
+                    modelSelect.innerHTML = '<option value="">請選擇</option>';
+                    data.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.textContent = model;
+                        modelSelect.appendChild(option);
+                    });
+                });
+
+            // 當型號改變時，載入類型1
+            modelSelect.addEventListener('change', function () {
+                const model = modelSelect.value;
+                if (model) {
+                    fetch(`backend/get_filtered_options.php?type=type1&model=${model}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            type1Select.innerHTML = '<option value="">請選擇</option>';
+                            type2Select.innerHTML = '<option value="">請選擇</option>'; // 清空類型2
+                            data.forEach(type1 => {
+                                const option = document.createElement('option');
+                                option.value = type1;
+                                option.textContent = type1;
+                                type1Select.appendChild(option);
+                            });
+                        });
+                } else {
+                    type1Select.innerHTML = '<option value="">請選擇</option>';
+                    type2Select.innerHTML = '<option value="">請選擇</option>';
+                }
+            });
+
+            // 當類型1改變時，載入類型2
+            type1Select.addEventListener('change', function () {
+                const model = modelSelect.value;
+                const type1 = type1Select.value;
+                if (type1) {
+                    fetch(`backend/get_filtered_options.php?type=type2&model=${model}&type1=${type1}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            type2Select.innerHTML = '<option value="">請選擇</option>';
+                            data.forEach(type2 => {
+                                const option = document.createElement('option');
+                                option.value = type2;
+                                option.textContent = type2;
+                                type2Select.appendChild(option);
+                            });
+                        });
+                } else {
+                    type2Select.innerHTML = '<option value="">請選擇</option>';
+                }
+            });
+
+            // 動態加載 items 表格內容
+            fetch('backend/get_items.php')
+                .then(response => response.text())
+                .then(data => {
+                    tableBody.innerHTML = data;
+                })
+                .catch(error => console.error('Error loading items:', error));
+
+            // 監聽刪除、編輯按鈕點擊事件
+            document.getElementById('itemsTableBody').addEventListener('click', function (e) {
+                // 監聽刪除
+                if (e.target.classList.contains('delete-btn') || e.target.closest('.delete-btn')) {
+                    const button = e.target.closest('.delete-btn');
+                    const id = button.getAttribute('data-id');
+
+                    if (confirm('確定要刪除此項目嗎？')) {
+                        // 發送刪除請求
+                        fetch('backend/delete_item.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id })
+                        })
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(data => { throw new Error(data.error); });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            alert(data.message);
+                            location.reload(); // 刷新頁面顯示最新數據
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert(error.message);
+                        });
+                    }
+                }
+
+                // 監聽編輯
+                if (e.target.classList.contains('edit-btn') || e.target.closest('.edit-btn')) {
+                    const button = e.target.closest('.edit-btn');
+                    const id = button.getAttribute('data-id');
+
+                    // 獲取該貨物的數據
+                    fetch(`backend/get_item.php?id=${id}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            itemIdField.value = data.id;
+                            colorField.value = data.color;
+                            materialField.value = data.material;
+                            modelField.value = data.model;
+                            type1Field.value = data.type1;
+                            type2Field.value = data.type2;
+                            quantityField.value = data.quantity;
+
+                            // 打開編輯模態框
+                            const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
+                            modal.show();
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('Failed to load item data');
+                        });
+                }
+            });
+
+            // 表單提交處理
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                const id = itemIdField.value;
+                const color = colorField.value;
+                const material = materialField.value;
+                const model = modelField.value;
+                const type1 = type1Field.value;
+                const type2 = type2Field.value;
+                const quantity = quantityField.value;
+
+                const url = id ? 'backend/edit_item.php' : 'backend/add_item.php';
+                const requestData = { id, color, material, model, type1, type2, quantity };
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    location.reload(); // 刷新頁面
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to save item');
+                });
+            });
+        });
+
+        document.getElementById('addItemForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            // 獲取表單數據
+            // const label = document.getElementById('itemLabel').value;
+            const color = document.getElementById('itemColor').value;
+            const material = document.getElementById('itemMaterial').value;
+            const model = document.getElementById('itemModel').value;
+            const type1 = document.getElementById('itemType1').value;
+            const type2 = document.getElementById('itemType2').value;
+            const quantity = document.getElementById('itemQuantity').value;
+
+            // 構建請求數據
+            const requestData = {
+                // label,
+                color,
+                material,
+                model,
+                type1,
+                type2,
+                quantity
+            };
+
+            // 發送 POST 請求到後端 API
+            fetch('backend/add_item.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { throw new Error(data.error); });
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert(data.message);
+
+                // 清空表單
+                document.getElementById('addItemForm').reset();
+
+                // 關閉模態框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addItemModal'));
+                modal.hide();
+
+                // 刷新表格或更新表格內容
+                location.reload(); // 簡單處理：刷新頁面顯示最新數據
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert(error.message);
+            });
+        });
+    </script>
+</body>
+</html>
